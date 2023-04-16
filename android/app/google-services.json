@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "126919796270",
+    "firebase_url": "https://sistemalanchonete-default-rtdb.firebaseio.com",
+    "project_id": "sistemalanchonete",
+    "storage_bucket": "sistemalanchonete.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:126919796270:android:c0d76218201a885a1421bf",
+        "android_client_info": {
+          "package_name": "si700.trabalho.lanchonete"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "126919796270-85evbbcvj2f1m51h9vg0ppp5r13hc260.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDMXgAtIWw6sX4OzzpxZzvcSb3R_iNHPDE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "126919796270-85evbbcvj2f1m51h9vg0ppp5r13hc260.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
