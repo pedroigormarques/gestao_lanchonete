@@ -1,13 +1,7 @@
 import 'package:lanchonete/cardapio/models/produto_cardapio.dart';
+import 'package:lanchonete/stream/bloc/stream_event.dart';
 
-abstract class ProdutoCardapioEvent {}
-
-class IniciarStreamProdutosCardapio extends ProdutoCardapioEvent {
-  String uid;
-  IniciarStreamProdutosCardapio(this.uid);
-}
-
-class PararStreamProdutosCardapio extends ProdutoCardapioEvent {}
+abstract class ProdutoCardapioEvent extends StreamEvent {}
 
 class CarregarProdutosCardapio extends ProdutoCardapioEvent {}
 

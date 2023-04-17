@@ -4,6 +4,7 @@ import 'package:lanchonete/login/bloc/autenticacao_bloc.dart';
 import 'package:lanchonete/login/bloc/autenticacao_event.dart';
 import 'package:lanchonete/login/bloc/autenticacao_state.dart';
 import 'package:lanchonete/login/models/usuario.dart';
+import 'package:lanchonete/view/tela_carregamento.dart';
 
 class TelaAtualizar extends StatelessWidget {
   TelaAtualizar({Key? key}) : super(key: key);
@@ -15,7 +16,9 @@ class TelaAtualizar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Usuario _usuario = (BlocProvider.of<AutenticacaoBloc>(context).state as Autenticado).usuario;
+    Usuario _usuario =
+        (BlocProvider.of<AutenticacaoBloc>(context).state as Autenticado)
+            .usuario;
     _nomeLanchonete = _usuario.nomeLanchonete;
     _endereco = _usuario.endereco;
 
@@ -79,34 +82,68 @@ class TelaAtualizar extends StatelessWidget {
             mainAxisSize: MainAxisSize.max,
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              ElevatedButton(
-                onPressed: () {
-                  atualizarDado(context, _corpoAtualizacaoDados()).then((resposta) {
-                    if (resposta) BlocProvider.of<AutenticacaoBloc>(context).add(AtualizarInformacoes(_nomeLanchonete, _endereco));
-                  });
-                },
-                child: const Text("Atualizar Dados"),
+              _gerarBotaoAtualizacao(
+                context: context,
+                corpo: _corpoAtualizacaoDados(),
+                textoBotao: "Atualizar Dados",
+                textoCarregamento: 'Atualizando os dados...',
+                tipoEvento: AtualizarInformacoes,
               ),
-              ElevatedButton(
-                onPressed: () {
-                  atualizarDado(context, _corpoAtualizacaoEmail()).then((resposta) {
-                    if (resposta) BlocProvider.of<AutenticacaoBloc>(context).add(AtualizarEmail(_novoEmail!, _senhaAtual!));
-                  });
-                },
-                child: const Text("Alterar email"),
+              _gerarBotaoAtualizacao(
+                context: context,
+                corpo: _corpoAtualizacaoEmail(),
+                textoBotao: "Alterar email",
+                textoCarregamento: 'Atualizando o email...',
+                tipoEvento: AtualizarEmail,
               ),
-              ElevatedButton(
-                onPressed: () {
-                  atualizarDado(context, _corpoAtualizacaoSenha()).then((resposta) {
-                    if (resposta) BlocProvider.of<AutenticacaoBloc>(context).add(AtualizarSenha(_senhaAtual!, _novaSenha!));
-                  });
-                },
-                child: const Text("Alterar senha"),
+              _gerarBotaoAtualizacao(
+                context: context,
+                corpo: _corpoAtualizacaoSenha(),
+                textoBotao: "Alterar senha",
+                textoCarregamento: 'Atualizando a senha...',
+                tipoEvento: AtualizarSenha,
               ),
             ],
           )
         ],
       ),
+    );
+  }
+
+  ElevatedButton _gerarBotaoAtualizacao({
+    required BuildContext context,
+    required List<Widget> corpo,
+    required String textoBotao,
+    required String textoCarregamento,
+    required Type tipoEvento,
+  }) {
+    return ElevatedButton(
+      onPressed: () {
+        atualizarDado(context, corpo).then((resposta) {
+          if (resposta) {
+            TelaCarregamento.gerarDialogCarregando(context, textoCarregamento);
+
+            switch (tipoEvento) {
+              case AtualizarSenha:
+                BlocProvider.of<AutenticacaoBloc>(context).add(
+                  AtualizarSenha(_senhaAtual!, _novaSenha!),
+                );
+                break;
+              case AtualizarEmail:
+                BlocProvider.of<AutenticacaoBloc>(context).add(
+                  AtualizarEmail(_novoEmail!, _senhaAtual!),
+                );
+                break;
+              case AtualizarInformacoes:
+                BlocProvider.of<AutenticacaoBloc>(context).add(
+                  AtualizarInformacoes(_nomeLanchonete, _endereco),
+                );
+                break;
+            }
+          }
+        });
+      },
+      child: Text(textoBotao),
     );
   }
 
@@ -122,7 +159,8 @@ class TelaAtualizar extends StatelessWidget {
     return [nomeEstabelecimentoFormField(), enderecoFormField()];
   }
 
-  Future<bool> atualizarDado(BuildContext context, List<Widget> corpoAtualicacao) async {
+  Future<bool> atualizarDado(
+      BuildContext context, List<Widget> corpoAtualicacao) async {
     GlobalKey<FormState> _formKey = GlobalKey<FormState>();
     return await showDialog(
         context: context,

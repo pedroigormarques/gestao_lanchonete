@@ -1,4 +1,4 @@
-package si700.trabalho.lanchonete
+package com.example.lanchonetecomapi
 
 import io.flutter.embedding.android.FlutterActivity
 

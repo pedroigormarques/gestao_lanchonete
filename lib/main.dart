@@ -1,9 +1,9 @@
-import 'package:firebase_core/firebase_core.dart';
-
+import 'package:flutlab_logcat/flutlab_logcat.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:lanchonete/login/bloc/autenticacao_bloc.dart';
+import 'package:lanchonete/provider/conexao/controlador_estado_app.dart';
 import 'package:lanchonete/view/tela_inical.dart';
 
 import 'package:lanchonete/cardapio/bloc/produto_cardapio_bloc.dart';
@@ -13,7 +13,8 @@ import 'package:lanchonete/produtoEstoque/bloc/produto_estoque_bloc.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  FlutLabLogcat.init();
+  ControladorApp.inicializar();
   runApp(MyApp());
 }
 
@@ -34,7 +35,10 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.indigo,
         ),
         home: TelaInicial(),
-        localizationsDelegates: const [GlobalMaterialLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate
+        ],
         supportedLocales: const [Locale('pt', "BR")],
       ),
     );

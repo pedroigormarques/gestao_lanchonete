@@ -35,10 +35,14 @@ class TelaEdicaoProdutoEstoque extends StatelessWidget {
     return SizedBox.expand(
       child: Scaffold(
         appBar: AppBar(
-          title: _opcaoAcesso == 0 ? const Text('Adicionar novo Produto') : const Text('Atualizar Produto'),
+          title: _opcaoAcesso == 0
+              ? const Text('Adicionar novo Produto')
+              : const Text('Atualizar Produto'),
         ),
         body: BlocConsumer<ProdutoEstoqueBloc, ProdutoEstoqueState>(
-          buildWhen: (previous, current) => current is! EstadoDeErroProdutoEstoque && current is! EstadoDeSucessoProdutoEstoque,
+          buildWhen: (previous, current) =>
+              current is! EstadoDeErroProdutoEstoque &&
+              current is! EstadoDeSucessoProdutoEstoque,
           builder: (context, state) {
             if (idProduto != null) {
               if (state is CarregandoProdutoEstoque) {
@@ -46,7 +50,8 @@ class TelaEdicaoProdutoEstoque extends StatelessWidget {
               }
 
               if (state is ErroCarregarProdutoEstoque) {
-                return TelaErro.gerarCorpoTelaErro("Erro ao carregar o produto do estoque a ser atualizado");
+                return TelaErro.gerarCorpoTelaErro(
+                    "Erro ao carregar o produto do estoque a ser atualizado");
               }
 
               if (state is ProdutoDoEstoqueCarregado) {
@@ -65,7 +70,8 @@ class TelaEdicaoProdutoEstoque extends StatelessWidget {
                   children: [
                     TextFormField(
                       initialValue: _nomeProduto,
-                      decoration: const InputDecoration(labelText: "Nome do produto"),
+                      decoration:
+                          const InputDecoration(labelText: "Nome do produto"),
                       validator: (nome) {
                         if (nome != null) {
                           if (nome == "") {
@@ -91,8 +97,10 @@ class TelaEdicaoProdutoEstoque extends StatelessWidget {
                     ),
                     TextFormField(
                       keyboardType: TextInputType.number,
-                      initialValue: _quantidade != null ? _quantidade.toString() : "",
-                      decoration: const InputDecoration(labelText: "Quantidade"),
+                      initialValue:
+                          _quantidade != null ? _quantidade.toString() : "",
+                      decoration:
+                          const InputDecoration(labelText: "Quantidade"),
                       validator: (String? num) {
                         if (num != null) {
                           int? aux = int.tryParse(num);
@@ -116,9 +124,13 @@ class TelaEdicaoProdutoEstoque extends StatelessWidget {
                           child: Container(
                             margin: const EdgeInsets.all(10),
                             padding: const EdgeInsets.symmetric(horizontal: 15),
-                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.grey[200]),
+                            decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: Colors.grey[200]),
                             child: DropdownButtonFormField<String>(
-                              value: _unidade != null ? _unidade!.index.toString() : null,
+                              value: _unidade != null
+                                  ? _unidade!.index.toString()
+                                  : null,
                               icon: const Icon(Icons.arrow_drop_down),
                               elevation: 16,
                               isExpanded: true,
@@ -133,7 +145,8 @@ class TelaEdicaoProdutoEstoque extends StatelessWidget {
                                   child: Text(describeEnum(value)),
                                 );
                               }).toList(),
-                              validator: (String? un) => un == null ? "Selecione uma unidade" : null,
+                              validator: (String? un) =>
+                                  un == null ? "Selecione uma unidade" : null,
                               onSaved: (String? un) {
                                 _unidade = UNIDADE.values[int.parse(un!)];
                               },
@@ -151,21 +164,30 @@ class TelaEdicaoProdutoEstoque extends StatelessWidget {
                               _formKey.currentState!.save();
 
                               if (_opcaoAcesso == 0) {
+                                TelaCarregamento.gerarDialogCarregando(context,
+                                    'Adicionando produto ao estoque...');
                                 _produtoEstoqueBloc.add(
                                   AdicionarAoEstoque(
-                                    ProdutoEstoque(_nomeProduto!, _descricao!, _quantidade!, _unidade!),
+                                    ProdutoEstoque(_nomeProduto!, _descricao!,
+                                        _quantidade!, _unidade!),
                                   ),
                                 );
                               } else {
+                                TelaCarregamento.gerarDialogCarregando(context,
+                                    'Atualizando produto do estoque...');
                                 _produtoEstoqueBloc.add(
                                   AtualizarProdutoDoEstoque(
-                                    ProdutoEstoque(_nomeProduto!, _descricao!, _quantidade!, _unidade!, id: idProduto),
+                                    ProdutoEstoque(_nomeProduto!, _descricao!,
+                                        _quantidade!, _unidade!,
+                                        id: idProduto),
                                   ),
                                 );
                               }
                             }
                           },
-                          child: _opcaoAcesso == 0 ? const Text("Cadastrar") : const Text("Salvar alterações"),
+                          child: _opcaoAcesso == 0
+                              ? const Text("Cadastrar")
+                              : const Text("Salvar alterações"),
                         ),
                       ],
                     ),
@@ -175,12 +197,19 @@ class TelaEdicaoProdutoEstoque extends StatelessWidget {
             );
           },
           listener: (BuildContext context, state) {
+            if (state is EstadoDeErroProdutoEstoque ||
+                state is EstadoDeSucessoProdutoEstoque) {
+              Navigator.pop(context); //remove o carregamento
+            }
             if (state is EstadoDeErroProdutoEstoque) {
               NotificacaoSnackBar.gerarSnackBar(context, "ERRO: " + state.erro);
             }
             if (state is EstadoDeSucessoProdutoEstoque) {
               NotificacaoSnackBar.gerarSnackBar(
-                  context, _opcaoAcesso == 0 ? "Cadastro do produto concluído" : "Alterações no produto concluídas");
+                  context,
+                  _opcaoAcesso == 0
+                      ? "Cadastro do produto concluído"
+                      : "Alterações no produto concluídas");
               Navigator.pop(context);
             }
           },

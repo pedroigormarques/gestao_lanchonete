@@ -23,13 +23,16 @@ class Pedido implements Comparable<Pedido> {
 
   Pedido.fromMap(map, List<ProdutoCardapio> produtosCardapio) {
     mesa = map["mesa"];
-    _valorConta = map["valorConta"];
-    horaAbertura = DateTime.parse(map["horaAbertura"]);
+    _valorConta = double.parse(map["valorConta"].toString());
+    horaAbertura = DateTime.parse(map["horaAbertura"]).toLocal();
 
-    if (map["produtosVendidos"] != null) {
-      (map["produtosVendidos"] as Map).forEach((key, value) {
-        produtosVendidos[produtosCardapio.firstWhere((element) => element.id == key)] = value;
-      });
+    List dados = map["produtosVendidos"];
+    for (dynamic item in dados) {
+      produtosVendidos[produtosCardapio.firstWhere(
+        (element) => element.id == item[0],
+        orElse: () =>
+            throw FormatException("Produto de id ${item[0]} não encontrado"),
+      )] = item[1];
     }
   }
 
@@ -39,8 +42,9 @@ class Pedido implements Comparable<Pedido> {
     map["valorConta"] = valorConta;
     map["horaAbertura"] = horaAbertura.toString();
 
-    map["produtosVendidos"] =
-        produtosVendidos.map((produtoCardapio, quantidade) => MapEntry<String, int>(produtoCardapio.id, quantidade));
+    map["produtosVendidos"] = produtosVendidos.map(
+        (produtoCardapio, quantidade) =>
+            MapEntry<String, int>(produtoCardapio.id, quantidade));
     return map;
   }
 
@@ -66,7 +70,8 @@ class Pedido implements Comparable<Pedido> {
 
   void adicionarProduto(ProdutoCardapio produto) {
     if (produto.visualizarQuantidade() == 0) {
-      throw const FormatException("Quantidade insuficiente para ser adicionado ao pedido");
+      throw const FormatException(
+          "Quantidade insuficiente para ser adicionado ao pedido");
     }
 
     if (produtosVendidos.keys.contains(produto)) {

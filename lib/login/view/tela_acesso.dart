@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lanchonete/login/bloc/autenticacao_bloc.dart';
 import 'package:lanchonete/login/bloc/autenticacao_event.dart';
+import 'package:lanchonete/view/tela_carregamento.dart';
 
 class TelaAcesso extends StatelessWidget {
   const TelaAcesso({Key? key}) : super(key: key);
@@ -56,7 +57,10 @@ class TelaAcesso extends StatelessWidget {
                   onPressed: () {
                     if (formkey.currentState!.validate()) {
                       formkey.currentState!.save();
-                      BlocProvider.of<AutenticacaoBloc>(context).add(LogarUsuario(_email!, _senha!));
+                      TelaCarregamento.gerarDialogCarregando(
+                          context, 'Validando usuário...');
+                      BlocProvider.of<AutenticacaoBloc>(context)
+                          .add(LogarUsuario(_email!, _senha!));
                     }
                   },
                   child: const Text("Acessar"),

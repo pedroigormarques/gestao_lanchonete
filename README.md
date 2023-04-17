@@ -1,16 +1,12 @@
-# hello_world
+# Aplicativo de gestão para lanchonete
 
-A new Flutter project.
+## Descrição
 
-## Getting Started
+Projeto criado predominantemente na disciplina de dispositivos móveis da faculdade, o qual foi desenvolvido em **Flutter**.
+Este aplicativo está sendo elaborado na IDE online [FlutLab](https://flutlab.io/) devido às facilidades de utilização e desenvolvimento.
 
-This project is a starting point for a Flutter application.
+Na disciplina, foi elaborado a versão utilizando o Firebase para autenticação e armazenamento dos dados do aplicativo, estando disponível na branch **[mobile-firebase](https://github.com/pedroigormarques/gestao_lanchonete/tree/mobile-firebase)**. Como aprofundamento dos estudos, está sendo criado uma nova versão do aplicativo utilizando a **[API-lanchonete](https://github.com/pedroigormarques/api-lanchonete)** desenvolvida, o qual se encontra na branch **[mobile-api](https://github.com/pedroigormarques/gestao_lanchonete/tree/mobile-api)**.
 
-A few resources to get you started if this is your first Flutter project:
+## Observações
 
-- [Lab: Write your first Flutter app](https://flutter.dev/docs/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://flutter.dev/docs/cookbook)
-
-For help getting started with Flutter, view our
-[online documentation](https://flutter.dev/docs), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Devido ao uso dos serviços do **Firebase** (no mobile-firebase) e o pacote **Eventsource** (no mobile-api), as principais funções do aplicativo só funcionam instalando o apk em um dispositivo, ainda não sendo possível utilizar o emulador online disponível na IDE.
