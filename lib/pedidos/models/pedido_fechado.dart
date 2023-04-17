@@ -20,28 +20,35 @@ class PedidoFechado {
       _produtosVendidos[produtoVendido.nomeProduto] = quantidade;
 
       produtoVendido.composicao.forEach((produtoUsado, qtd) {
-        if (!_produtosUtilizados.containsKey("${produtoUsado.nomeProduto} ( em ${describeEnum(produtoUsado.unidade)})")) {
-          _produtosUtilizados["${produtoUsado.nomeProduto} ( em ${describeEnum(produtoUsado.unidade)})"] = 0;
+        if (!_produtosUtilizados.containsKey(
+            "${produtoUsado.nomeProduto} ( em ${describeEnum(produtoUsado.unidade)})")) {
+          _produtosUtilizados[
+              "${produtoUsado.nomeProduto} ( em ${describeEnum(produtoUsado.unidade)})"] = 0;
         }
         _produtosUtilizados.update(
-            "${produtoUsado.nomeProduto} ( em ${describeEnum(produtoUsado.unidade)})", (value) => value + qtd * quantidade);
+            "${produtoUsado.nomeProduto} ( em ${describeEnum(produtoUsado.unidade)})",
+            (value) => value + qtd * quantidade);
       });
     });
   }
 
   PedidoFechado.fromMap(map) {
     mesa = map["mesa"];
-    valorConta = map["valorConta"];
-    if (map["produtosVendidos"] != null) {
-      (map["produtosVendidos"] as Map).forEach((key, value) {
-        _produtosVendidos[key] = value;
-      });
-      (map["produtosUtilizados"] as Map).forEach((key, value) {
-        _produtosUtilizados[key] = value;
-      });
-    }    
-    horaAbertura = DateTime.parse(map["horaAbertura"]);
-    _horaFechamento = DateTime.parse(map["horaFechamento"]);
+    valorConta = double.parse(map["valorConta"].toString());
+
+    List produtosUtilizadosPedido = map["produtosUtilizados"];
+    for (dynamic item in produtosUtilizadosPedido) {
+      _produtosUtilizados[
+          "${item[0]['nomeProduto']} ( em ${item[0]['unidade']})"] = item[1];
+    }
+
+    List dados = map["produtosVendidos"];
+    for (dynamic item in dados) {
+      _produtosVendidos[item[0]['nomeProduto']] = item[1];
+    }
+
+    horaAbertura = DateTime.parse(map["horaAbertura"]).toLocal();
+    _horaFechamento = DateTime.parse(map["horaFechamento"]).toLocal();
   }
 
   toMap() {

@@ -25,7 +25,9 @@ class TelaProdutoEstoque extends StatelessWidget {
     _produtoEstoqueBloc.add(CarregarProdutoEstoque(_idProduto));
 
     return BlocConsumer<ProdutoEstoqueBloc, ProdutoEstoqueState>(
-      buildWhen: (previous, current) => current is! EstadoDeErroProdutoEstoque && current is! EstadoDeSucessoProdutoEstoque,
+      buildWhen: (previous, current) =>
+          current is! EstadoDeErroProdutoEstoque &&
+          current is! EstadoDeSucessoProdutoEstoque,
       builder: (context, state) {
         if (state is CarregandoProdutoEstoque) {
           return TelaCarregamento.gerarTelaCarregamento(_tituloDaPagina);
@@ -42,7 +44,9 @@ class TelaProdutoEstoque extends StatelessWidget {
                       context,
                       PageRouteBuilder(
                           reverseTransitionDuration: Duration.zero,
-                          pageBuilder: (context, animation1, secondaryAnimation) => TelaEdicaoProdutoEstoque(idProduto: _idProduto)),
+                          pageBuilder: (context, animation1,
+                                  secondaryAnimation) =>
+                              TelaEdicaoProdutoEstoque(idProduto: _idProduto)),
                     );
                     _produtoEstoqueBloc.add(CarregarProdutoEstoque(_idProduto));
                   },
@@ -50,9 +54,13 @@ class TelaProdutoEstoque extends StatelessWidget {
                 ),
                 IconButton(
                   onPressed: () {
-                    DialogConfirmacao.gerarDialogConfirmacao(context, 'Deseja realmente remover este produto?').then(
+                    DialogConfirmacao.gerarDialogConfirmacao(
+                            context, 'Deseja realmente remover este produto?')
+                        .then(
                       (resposta) {
                         if (resposta) {
+                          TelaCarregamento.gerarDialogCarregando(
+                              context, 'Removendo produto do estoque...');
                           _produtoEstoqueBloc.add(RemoverDoEstoque(_idProduto));
                         }
                       },
@@ -79,14 +87,17 @@ class TelaProdutoEstoque extends StatelessWidget {
                           state.produto.nomeProduto,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 32, fontWeight: FontWeight.bold),
                         ),
-                        const Padding(padding: EdgeInsets.symmetric(vertical: 16.0)),
+                        const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16.0)),
                         Text(
                           'Estoque: ${state.produto.quantidade} ${describeEnum(state.produto.unidade)}',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w400),
+                          style: const TextStyle(
+                              fontSize: 24, fontWeight: FontWeight.w400),
                         ),
                       ],
                     ),
@@ -109,14 +120,20 @@ class TelaProdutoEstoque extends StatelessWidget {
             ),
           );
         }
-        return TelaErro.gerarTelaErro(_tituloDaPagina, "Erro ao carregar informações do produto");
+        return TelaErro.gerarTelaErro(
+            _tituloDaPagina, "Erro ao carregar informações do produto");
       },
       listener: (BuildContext context, state) {
+        if (state is ErroAoRemoverProdutoEstoque ||
+            state is SucessoAoRemoverProdutoEstoque) {
+          Navigator.pop(context); //remove o carregamento
+        }
         if (state is ErroAoRemoverProdutoEstoque) {
           NotificacaoSnackBar.gerarSnackBar(context, "ERRO: " + state.erro);
         }
         if (state is SucessoAoRemoverProdutoEstoque) {
-          NotificacaoSnackBar.gerarSnackBar(context, "Produto removido com sucesso");
+          NotificacaoSnackBar.gerarSnackBar(
+              context, "Produto removido com sucesso");
           Navigator.pop(context);
         }
       },

@@ -1,7 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="si700.trabalho.lanchonete">
+    package="com.example.lanchonetecomapi">
+    <uses-permission android:name="android.permission.INTERNET"/>
    <application
-        android:label="lanchonete"
+        android:label="lanchonetecomapi"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

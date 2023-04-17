@@ -1,14 +1,8 @@
 import 'package:lanchonete/cardapio/models/produto_cardapio.dart';
 import 'package:lanchonete/pedidos/models/pedido.dart';
+import 'package:lanchonete/stream/bloc/stream_event.dart';
 
-abstract class PedidoEvent {}
-
-class IniciarStreamPedidos extends PedidoEvent {
-  final String uid;
-  IniciarStreamPedidos(this.uid);
-}
-
-class PararStreamPedidos extends PedidoEvent {}
+abstract class PedidoEvent extends StreamEvent {}
 
 class CarregarListaPedidos extends PedidoEvent {}
 
@@ -37,7 +31,8 @@ class AdicionarQuantidadeItemPedido extends PedidoEvent {
   final String pedidoId;
   final int quantidade;
 
-  AdicionarQuantidadeItemPedido(this.pedidoId, this.produtoCardapio, this.quantidade);
+  AdicionarQuantidadeItemPedido(
+      this.pedidoId, this.produtoCardapio, this.quantidade);
 }
 
 class RemoverQuantidadeItemPedido extends PedidoEvent {
@@ -45,7 +40,8 @@ class RemoverQuantidadeItemPedido extends PedidoEvent {
   final String pedidoId;
   final int quantidade;
 
-  RemoverQuantidadeItemPedido(this.pedidoId, this.produtoCardapio, this.quantidade);
+  RemoverQuantidadeItemPedido(
+      this.pedidoId, this.produtoCardapio, this.quantidade);
 }
 
 class AdicionarPedido extends PedidoEvent {

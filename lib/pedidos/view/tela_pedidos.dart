@@ -20,7 +20,8 @@ class TelaPedidos extends StatelessWidget {
 
     return Scaffold(
       body: BlocConsumer<PedidoBloc, PedidoState>(
-        buildWhen: (previous, current) => current is! EstadoDeErroPedido && current is! EstadoDeSucessoPedido,
+        buildWhen: (previous, current) =>
+            current is! EstadoDeErroPedido && current is! EstadoDeSucessoPedido,
         builder: (context, state) {
           if (state is CarregandoPedidos) {
             return TelaCarregamento.gerarCorpoTelaCarregamento();
@@ -32,7 +33,8 @@ class TelaPedidos extends StatelessWidget {
                 itemBuilder: (context, index) {
                   String idPedido = state.listaPedidos[index].id;
                   int _mesa = state.listaPedidos[index].mesa;
-                  String _horario = DateFormat("HH:mm:ss dd/MM/yyyy").format(state.listaPedidos[index].horaAbertura);
+                  String _horario = DateFormat("HH:mm:ss dd/MM/yyyy")
+                      .format(state.listaPedidos[index].horaAbertura);
                   double _valorConta = state.listaPedidos[index].valorConta;
 
                   return Card(
@@ -47,13 +49,16 @@ class TelaPedidos extends StatelessWidget {
                           PageRouteBuilder(
                               //transitionDuration: Duration.zero,
                               reverseTransitionDuration: Duration.zero,
-                              pageBuilder: (context, animation1, secondaryAnimation) => TelaPedido(idPedido)),
+                              pageBuilder:
+                                  (context, animation1, secondaryAnimation) =>
+                                      TelaPedido(idPedido)),
                         );
                         _pedidoBloc.add(CarregarListaPedidos());
                       },
                       title: Text(
                         'Mesa: ${_mesa.toString()}',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20.0),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 20.0),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -73,11 +78,16 @@ class TelaPedidos extends StatelessWidget {
           return TelaErro.gerarCorpoTelaErro("Erro ao carregar os pedidos!");
         },
         listener: (BuildContext context, state) {
+          if (state is ErroAoAdicionarPedido ||
+              state is SucessoAoAdicionarPedido) {
+            Navigator.pop(context); //remove o carregamento
+          }
           if (state is ErroAoAdicionarPedido) {
             NotificacaoSnackBar.gerarSnackBar(context, "ERRO: " + state.erro);
           }
           if (state is SucessoAoAdicionarPedido) {
-            NotificacaoSnackBar.gerarSnackBar(context, "Pedido aberto com sucesso");
+            NotificacaoSnackBar.gerarSnackBar(
+                context, "Pedido aberto com sucesso");
           }
         },
       ),
@@ -100,7 +110,8 @@ class TelaPedidos extends StatelessWidget {
                         padding: const EdgeInsets.all(8.0),
                         child: TextFormField(
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: "Número da mesa"),
+                          decoration: const InputDecoration(
+                              labelText: "Número da mesa"),
                           validator: (mesa) {
                             if (mesa != null) {
                               int? aux = int.tryParse(mesa);
@@ -143,7 +154,11 @@ class TelaPedidos extends StatelessWidget {
                 );
               }).then(
             (resposta) {
-              if (resposta) _pedidoBloc.add(AdicionarPedido(Pedido(_mesa, {})));
+              if (resposta) {
+                TelaCarregamento.gerarDialogCarregando(
+                    context, 'Abrindo pedido...');
+                _pedidoBloc.add(AdicionarPedido(Pedido(_mesa, {})));
+              }
             },
           );
         },

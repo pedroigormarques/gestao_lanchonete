@@ -11,7 +11,9 @@ class ProdutoCardapio implements Comparable<ProdutoCardapio> {
   late double _preco;
   late CATEGORIAS categoria;
 
-  ProdutoCardapio(this.nomeProduto, this.descricao, double preco, this.categoria, this.composicao, {String? id}) {
+  ProdutoCardapio(this.nomeProduto, this.descricao, double preco,
+      this.categoria, this.composicao,
+      {String? id}) {
     this.preco = preco;
     if (id != null) {
       this.id = id;
@@ -21,11 +23,17 @@ class ProdutoCardapio implements Comparable<ProdutoCardapio> {
   ProdutoCardapio.fromMap(map, List<ProdutoEstoque> produtosEstoque) {
     nomeProduto = map["nomeProduto"];
     descricao = map["descricao"];
-    _preco = map["preco"];
+    _preco = double.parse(map["preco"].toString());
     categoria = CATEGORIAS.values.byName(map["categoria"]);
-    (map["composicao"] as Map).forEach((key, value) {
-      composicao[produtosEstoque.firstWhere((element) => element.id == key)] = value;
-    });
+
+    List dados = map["composicao"];
+    for (dynamic item in dados) {
+      composicao[produtosEstoque.firstWhere(
+        (element) => element.id == item[0],
+        orElse: () =>
+            throw FormatException("Produto de id ${item[0]} não encontrado"),
+      )] = item[1];
+    }
   }
 
   toMap() {
@@ -34,7 +42,9 @@ class ProdutoCardapio implements Comparable<ProdutoCardapio> {
     map["descricao"] = descricao;
     map["preco"] = _preco;
     map["categoria"] = categoria.name;
-    map["composicao"] = composicao.map((produtoEstoque, quantidade) => MapEntry<String, int>(produtoEstoque.id, quantidade));
+    map["composicao"] = [];
+    composicao.forEach((produtoEstoque, quantidade) =>
+        map["composicao"].add([produtoEstoque.id, quantidade]));
     return map;
   }
 
@@ -65,7 +75,8 @@ class ProdutoCardapio implements Comparable<ProdutoCardapio> {
     if (val <= 0) {
       throw const FormatException("Valor inválido para realizar a remoção");
     } else if (visualizarQuantidade() < val) {
-      throw const FormatException("Quantidade insuficiente para realizar a remoção");
+      throw const FormatException(
+          "Quantidade insuficiente para realizar a remoção");
     } else {
       composicao.forEach((key, value) {
         key.removerQuantidade(value * val);
@@ -96,7 +107,7 @@ class ProdutoCardapio implements Comparable<ProdutoCardapio> {
   void atualizarDados(ProdutoCardapio produto) {
     nomeProduto = produto.nomeProduto;
     descricao = produto.descricao;
-    composicao = produto.composicao; 
+    composicao = produto.composicao;
     _preco = produto._preco;
     categoria = produto.categoria;
   }

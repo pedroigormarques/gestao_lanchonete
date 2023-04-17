@@ -1,52 +1,81 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:dio/dio.dart';
+import 'package:lanchonete/stream/controller/controlador_stream_api.dart';
+import 'package:lanchonete/provider/conexao/dados_provider.dart';
+import 'package:lanchonete/provider/conexao/dio_controller.dart';
+import 'package:lanchonete/provider/stream_provider.dart';
+import 'package:lanchonete/provider/manipulador_erro.dart';
 import 'package:lanchonete/cardapio/models/produto_cardapio.dart';
 import 'package:lanchonete/cardapio/models/cardapio.dart';
-import 'package:lanchonete/Provider/estoque_provider.dart';
+import 'package:lanchonete/provider/estoque_provider.dart';
 import 'package:lanchonete/produtoEstoque/Models/produto_estoque.dart';
 
-class CardapioFirestoreServer {
+class CardapioApiProvider extends StreamProvider {
   // Atributo que irá afunilar todas as consultas
-  static CardapioFirestoreServer helper = CardapioFirestoreServer._createInstance();
-
+  static CardapioApiProvider helper = CardapioApiProvider._createInstance();
   // Construtor privado
-  CardapioFirestoreServer._createInstance();
+  CardapioApiProvider._createInstance()
+      : super(DadosProvider.localProdutosCardapio + '/sse');
 
-  String? _uid;
-
-  final FirebaseFirestore _instance = FirebaseFirestore.instance;
   Cardapio? _cardapio;
-
-  void limparDadosProdutosCardapio() {
-    _cardapio = null;
-    _uid = null;
+  bool get carregado {
+    return _cardapio != null && statusConexao == StatusConexao.conectado;
   }
 
-  Stream<void> iniciarStreamProdutosCardapio(String uid) {
-    _uid = uid;
+  final _urlBaseCardapio = DadosProvider.localProdutosCardapio;
+  final Dio _dio = DioController.instance.dioAreaRestrita;
+
+  @override
+  bool precondicaoConluida() {
+    return EstoqueApiProvider.helper.carregado;
+  }
+
+  @override
+  String gerarMensagemErroPrecondicao() {
+    return 'Cardapio não carregado devido ao estoque não estar carregado';
+  }
+
+  @override
+  void criarRepositorioDados() {
     _cardapio = Cardapio();
+  }
 
-    CollectionReference cardapioColection = _instance.collection("cardapios").doc(_uid).collection("meu_cardapio");
-    return cardapioColection.snapshots().map((event) {
-      List<ProdutoEstoque> produtosEstoque = EstoqueFirestoreServer.helper.getProdutoEstoqueList();
-      for (DocumentChange docChange in event.docChanges) {
-        ProdutoCardapio produtoCardapio = ProdutoCardapio.fromMap(docChange.doc.data(), produtosEstoque);
-        produtoCardapio.id = docChange.doc.id;
+  @override
+  void limparRepositorioDados() {
+    _cardapio = null;
+  }
 
-        switch (docChange.type.name) {
-          case "added":
+  @override
+  void mapFunction(List<Map> dados) {
+    try {
+      List<ProdutoEstoque> produtosEstoque =
+          EstoqueApiProvider.helper.getProdutoEstoqueList();
+
+      for (Map evento in dados) {
+        if (evento['acao'] == "Removido") {
+          _cardapio!.removerProduto(evento['id']);
+        } else {
+          ProdutoCardapio produtoCardapio =
+              ProdutoCardapio.fromMap(evento['data'], produtosEstoque);
+          produtoCardapio.id = evento['id'];
+          if (evento['acao'] == "Adicionado") {
             _cardapio!.adicionarProduto(produtoCardapio);
-            break;
-          case "removed":
-            _cardapio!.removerProduto(produtoCardapio.id);
-            break;
-          case "modified":
+          } else if (evento['acao'] == "Alterado") {
             _cardapio!.atualizarProduto(produtoCardapio);
-            break;
+          }
         }
       }
-      return; // notifica a alteração sem passar informações
-    });
+    } catch (e) {
+      _cardapio!.adicionarProduto(ProdutoCardapio(
+          'ERRO_CARREGAMENTO_NAO_CONCLUIDO',
+          e.toString(),
+          5,
+          CATEGORIAS.bebidas,
+          {},
+          id: 'as'));
+      rethrow;
+    }
+
+    return; // notifica a alteração sem passar informações
   }
 
   List<ProdutoCardapio> getCardapioList() {
@@ -57,33 +86,28 @@ class CardapioFirestoreServer {
     return _cardapio!.carregarProduto(produtoCardapioId);
   }
 
-  Future<int> insertProdutoCardapio(ProdutoCardapio produtoCardapio) async {
-    CollectionReference meuCardapio = _instance.collection("cardapios").doc(_uid).collection("meu_cardapio");
-    CollectionReference produtosEstoqueUtilizados =
-        _instance.collection("produtos_utilizados").doc(_uid).collection("produtos_estoque_utilizados");
-
-    bool produtoExiste = (await meuCardapio.where('nomeProduto', isEqualTo: produtoCardapio.nomeProduto).get()).docs.isNotEmpty;
-    if (produtoExiste) {
-      throw const FormatException("Já existe um produto com esse nome cadastrado");
-    } else {
-      DocumentReference newDocRef = meuCardapio.doc();
-      WriteBatch batch = _instance.batch();
-
-      batch.set(newDocRef, produtoCardapio.toMap());
-
-      produtoCardapio.composicao.forEach((produto, qtd) {
-        batch.set(produtosEstoqueUtilizados.doc(produto.id).collection("usado_em").doc(newDocRef.id), {newDocRef.id: true});
-      });
-
-      batch.commit();
-
-      produtoCardapio.id = newDocRef.id;
+  Future<void> insertProdutoCardapio(ProdutoCardapio produtoCardapio) async {
+    try {
+      var dados = produtoCardapio.toMap();
+      dados['idUsuario'] = uid;
+      await _dio.post(_urlBaseCardapio, data: dados);
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
     }
-    return 42;
   }
 
-  Future<int> updateProdutoCardapio(ProdutoCardapio produtoCardapioAntigo, ProdutoCardapio produtoCardapioAtualizado) async {
-    CollectionReference meuCardapio = _instance.collection("cardapios").doc(_uid).collection("meu_cardapio");
+  Future<void> updateProdutoCardapio(ProdutoCardapio produtoCardapioAntigo,
+      ProdutoCardapio produtoCardapioAtualizado) async {
+    try {
+      await _dio.put(
+        _urlBaseCardapio + "/${produtoCardapioAtualizado.id}",
+        data: produtoCardapioAtualizado.toMap(),
+      );
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
+    }
+
+    /*CollectionReference meuCardapio = _instance.collection("cardapios").doc(_uid).collection("meu_cardapio");
     CollectionReference produtosEstoqueUtilizados =
         _instance.collection("produtos_utilizados").doc(_uid).collection("produtos_estoque_utilizados");
 
@@ -122,43 +146,14 @@ class CardapioFirestoreServer {
 
       batch.commit();
     }
-    return 42;
+    return 42;*/
   }
 
-  Future<int> deleteProdutoCardapio(ProdutoCardapio produtoCardapio) async {
-    CollectionReference meuCardapio = _instance.collection("cardapios").doc(_uid).collection("meu_cardapio");
-    CollectionReference produtosEstoqueUtilizados =
-        _instance.collection("produtos_utilizados").doc(_uid).collection("produtos_estoque_utilizados");
-
-    bool produtoSendoUsado = await _getProdutoSendoUsado(produtoCardapio.id);
-
-    if (produtoSendoUsado) {
-      throw const FormatException("Produto está sendo utilizado por ao menos um pedido");
-    } else {
-      WriteBatch batch = _instance.batch();
-
-      batch.delete(meuCardapio.doc(produtoCardapio.id)); //remove o produto
-
-      for (ProdutoEstoque produto in produtoCardapio.composicao.keys) {
-        //remove da lista os produtos do estoque usados
-        batch.delete(produtosEstoqueUtilizados.doc(produto.id).collection("usado_em").doc(produtoCardapio.id));
-      }
-
-      batch.commit();
-    }
-
-    return 42;
-  }
-
-  Future<bool> _getProdutoSendoUsado(produtoCardapioId) async {
-    DocumentReference produtoCardapioUtilizado =
-        _instance.collection("produtos_utilizados").doc(_uid).collection("produtos_cardapio_utilizados").doc(produtoCardapioId);
-
-    QuerySnapshot querySnapshot = await produtoCardapioUtilizado.collection("usado_em").limit(1).get();
-    if (querySnapshot.docs.isNotEmpty) {
-      return true;
-    } else {
-      return false;
+  Future<void> deleteProdutoCardapio(ProdutoCardapio produtoCardapio) async {
+    try {
+      await _dio.delete(_urlBaseCardapio + "/${produtoCardapio.id}");
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
     }
   }
 }

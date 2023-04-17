@@ -1,55 +1,81 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:dio/dio.dart';
+import 'package:lanchonete/provider/conexao/dados_provider.dart';
+import 'package:lanchonete/provider/conexao/dio_controller.dart';
+import 'package:lanchonete/provider/stream_provider.dart';
+import 'package:lanchonete/provider/manipulador_erro.dart';
 import 'package:lanchonete/cardapio/models/produto_cardapio.dart';
-import 'package:lanchonete/Provider/cardapio_provider.dart';
+import 'package:lanchonete/provider/cardapio_provider.dart';
 import 'package:lanchonete/pedidos/models/lista_pedidos.dart';
 import 'package:lanchonete/pedidos/models/pedido.dart';
 import 'package:lanchonete/pedidos/models/pedido_fechado.dart';
 import 'package:lanchonete/pedidos/models/pedidos_fechados.dart';
-import 'package:lanchonete/produtoEstoque/Models/produto_estoque.dart';
 
-class PedidosFirestoreServer {
+class PedidosApiProvider extends StreamProvider {
   // Atributo que irá afunilar todas as consultas
-  static PedidosFirestoreServer helper = PedidosFirestoreServer._createInstance();
-
+  static PedidosApiProvider helper = PedidosApiProvider._createInstance();
   // Construtor privado
-  PedidosFirestoreServer._createInstance();
+  PedidosApiProvider._createInstance()
+      : super(DadosProvider.localPedidos + '/sse');
 
-  String? _uid;
+  final _urlBasePedidos = DadosProvider.localPedidos;
+  final _urlBasePedidosFechados = DadosProvider.localPedidosFechados;
+  final Dio _dio = DioController.instance.dioAreaRestrita;
 
-  final FirebaseFirestore _instance = FirebaseFirestore.instance;
   ListaPedidos? _pedidos;
 
-  void limparDadosProdutosEstoque() {
-    _pedidos = null;
-    _uid = null;
-  }
+  @override
+  void mapFunction(List<Map> dados) {
+    try {
+      List<ProdutoCardapio> produtosCardapio =
+          CardapioApiProvider.helper.getCardapioList();
 
-  Stream<void> iniciarStreamPedidos(String uid) {
-    _uid = uid;
-    _pedidos = ListaPedidos();
-
-    CollectionReference pedidosCollection = _instance.collection("pedidos").doc(_uid).collection("meus_pedidos");
-    return pedidosCollection.snapshots().map((event) {
-      List<ProdutoCardapio> produtosCardapio = CardapioFirestoreServer.helper.getCardapioList();
-      for (DocumentChange docChange in event.docChanges) {
-        Pedido pedido = Pedido.fromMap(docChange.doc.data(), produtosCardapio);
-        pedido.id = docChange.doc.id;
-
-        switch (docChange.type.name) {
-          case "added":
+      for (Map evento in dados) {
+        if (evento['acao'] == "Removido") {
+          _pedidos!.removerPedido(evento['id']);
+        } else {
+          Pedido pedido = Pedido.fromMap(evento['data'], produtosCardapio);
+          pedido.id = evento['id'];
+          if (evento['acao'] == "Adicionado") {
             _pedidos!.adicionarPedido(pedido);
-            break;
-          case "removed":
-            _pedidos!.removerPedido(pedido.id);
-            break;
-          case "modified":
+          } else if (evento['acao'] == "Alterado") {
             _pedidos!.atualizarPedido(pedido);
-            break;
+          }
         }
       }
-      return; // notifica a alteração sem passar informações
-    });
+    } catch (e) {
+      _pedidos!.adicionarPedido(Pedido(
+        -2,
+        {
+          ProdutoCardapio('ERRO_CARREGAMENTO_NAO_CONCLUIDO', e.toString(), 5,
+              CATEGORIAS.bebidas, {},
+              id: 'as'): 1
+        },
+        id: 'as',
+      ));
+      rethrow;
+    }
+
+    return; // notifica a alteração sem passar informações
+  }
+
+  @override
+  bool precondicaoConluida() {
+    return CardapioApiProvider.helper.carregado;
+  }
+
+  @override
+  String gerarMensagemErroPrecondicao() {
+    return 'Pedidos não carregados devido ao cardapio não estar carregado';
+  }
+
+  @override
+  void criarRepositorioDados() {
+    _pedidos = ListaPedidos();
+  }
+
+  @override
+  void limparRepositorioDados() {
+    _pedidos = null;
   }
 
   List<Pedido> getPedidosList() {
@@ -60,170 +86,96 @@ class PedidosFirestoreServer {
     return _pedidos!.carregarPedido(pedidoId);
   }
 
-  Future<int> insertPedido(Pedido pedido) async {
-    CollectionReference meusPedidos = _instance.collection("pedidos").doc(_uid).collection("meus_pedidos");
-
-    bool pedidoAberto = (await meusPedidos.where('mesa', isEqualTo: pedido.mesa).get()).docs.isNotEmpty;
-    if (pedidoAberto) {
-      throw const FormatException("Já existe um pedido aberto para essa mesa");
-    } else {
-      DocumentReference docRef = await meusPedidos.add(pedido.toMap());
-      pedido.id = docRef.id;
+  Future<void> insertPedido(Pedido pedido) async {
+    try {
+      await _dio.post(
+        _urlBasePedidos,
+        data: {'idUsuario': uid, 'mesa': pedido.mesa},
+      );
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
     }
-    return 42;
   }
 
-  Future<int> updateAdicionarItemPedido(String pedidoId, Pedido pedido, String produtoAdicionadoId) async {
-    CollectionReference meusPedidos = _instance.collection("pedidos").doc(_uid).collection("meus_pedidos");
-    CollectionReference meuEstoque = _instance.collection("estoques").doc(_uid).collection("meu_estoque");
-    CollectionReference produtosCardapioUtilizados =
-        _instance.collection("produtos_utilizados").doc(_uid).collection("produtos_cardapio_utilizados");
-
-    WriteBatch batch = _instance.batch();
-
-    ProdutoCardapio produtoCardapioAtualizado =
-        pedido.produtosVendidos.keys.firstWhere((element) => element.id == produtoAdicionadoId);
-
-    List<ProdutoEstoque> produtosAtualizados = produtoCardapioAtualizado.composicao.keys.toList();
-
-    //remove as repetições
-    produtosAtualizados = produtosAtualizados.toSet().toList();
-
-    batch.update(meusPedidos.doc(pedidoId), pedido.toMap()); //atualiza o pedido
-
-    // adiciona o produto na lista de produtos do cardapio usados
-    batch.set(produtosCardapioUtilizados.doc(produtoAdicionadoId).collection("usado_em").doc(pedidoId), {pedidoId: true});
-
-    for (ProdutoEstoque produto in produtosAtualizados) {
-      batch.update(meuEstoque.doc(produto.id), {"quantidade": produto.quantidade}); //atualiza os produtos do estoque
+  Future<void> _updateItemPedido(
+      String pedidoId, int novaQtd, String produtoId) async {
+    try {
+      await _dio.post(
+        _urlBasePedidos + "/$pedidoId",
+        data: {"novaQtd": novaQtd, "idProdutoCardapio": produtoId},
+      );
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
     }
-
-    batch.commit();
-
-    return 42;
   }
 
-  Future<int> updateRemoverItemPedido(String pedidoId, Pedido pedido, ProdutoCardapio produtoRemovido) async {
-    CollectionReference meusPedidos = _instance.collection("pedidos").doc(_uid).collection("meus_pedidos");
-    CollectionReference meuEstoque = _instance.collection("estoques").doc(_uid).collection("meu_estoque");
-    CollectionReference produtosCardapioUtilizados =
-        _instance.collection("produtos_utilizados").doc(_uid).collection("produtos_cardapio_utilizados");
+  Future<void> updateAdicionarItemPedido(
+      String pedidoId, Pedido pedido, String produtoAdicionadoId) async {
+    try {
+      ProdutoCardapio produto = pedido.produtosVendidos.keys
+          .firstWhere((element) => element.id == produtoAdicionadoId);
 
-    WriteBatch batch = _instance.batch();
+      int novaqtd = pedido.produtosVendidos[produto]!;
 
-    List<ProdutoEstoque> produtosAtualizados = produtoRemovido.composicao.keys.toList();
-
-    //remove as repetições
-    produtosAtualizados = produtosAtualizados.toSet().toList();
-
-    batch.update(meusPedidos.doc(pedidoId), pedido.toMap()); //atualiza o pedido
-
-    // remove o produto da lista de produtos do cardapio usados
-    batch.delete(produtosCardapioUtilizados.doc(produtoRemovido.id).collection("usado_em").doc(pedidoId));
-
-    for (ProdutoEstoque produto in produtosAtualizados) {
-      batch.update(meuEstoque.doc(produto.id), {"quantidade": produto.quantidade}); //atualiza os produtos do estoque
+      await _updateItemPedido(pedidoId, novaqtd, produtoAdicionadoId);
+    } catch (_) {
+      rethrow;
     }
-
-    batch.commit();
-
-    return 42;
   }
 
-  Future<int> updateQuantidadeItemPedido(String pedidoId, Pedido pedido, String produtoAlteradoId) async {
-    CollectionReference meusPedidos = _instance.collection("pedidos").doc(_uid).collection("meus_pedidos");
-    CollectionReference meuEstoque = _instance.collection("estoques").doc(_uid).collection("meu_estoque");
-
-    WriteBatch batch = _instance.batch();
-
-    ProdutoCardapio produtoCardapioAlterado = pedido.produtosVendidos.keys.firstWhere((element) => element.id == produtoAlteradoId);
-
-    List<ProdutoEstoque> produtosAtualizados = produtoCardapioAlterado.composicao.keys.toList();
-
-    //remove as repetições
-    produtosAtualizados = produtosAtualizados.toSet().toList();
-
-    batch.update(meusPedidos.doc(pedidoId), pedido.toMap()); //atualiza o pedido
-
-    for (ProdutoEstoque produto in produtosAtualizados) {
-      batch.update(meuEstoque.doc(produto.id), {"quantidade": produto.quantidade}); //atualiza os produtos do estoque
+  Future<void> updateRemoverItemPedido(
+      String pedidoId, Pedido pedido, ProdutoCardapio produtoRemovido) async {
+    //pedido?, produtoCardapio?
+    try {
+      await _updateItemPedido(pedidoId, 0, produtoRemovido.id);
+    } catch (_) {
+      rethrow;
     }
-
-    batch.commit();
-
-    return 42;
   }
 
-  Future<int> deletePedido(Pedido pedido) async {
-    CollectionReference meusPedidos = _instance.collection("pedidos").doc(_uid).collection("meus_pedidos");
-    CollectionReference meuEstoque = _instance.collection("estoques").doc(_uid).collection("meu_estoque");
-    CollectionReference produtosCardapioUtilizados =
-        _instance.collection("produtos_utilizados").doc(_uid).collection("produtos_cardapio_utilizados");
+  Future<void> updateQuantidadeItemPedido(
+      String pedidoId, Pedido pedido, String produtoAlteradoId) async {
+    try {
+      ProdutoCardapio produto = pedido.produtosVendidos.keys
+          .firstWhere((element) => element.id == produtoAlteradoId);
 
-    WriteBatch batch = _instance.batch();
+      int novaqtd = pedido.produtosVendidos[produto]!;
 
-    List<ProdutoEstoque> produtosAtualizados = [];
-
-    while (pedido.produtosVendidos.isNotEmpty) {
-      ProdutoCardapio produto = pedido.produtosVendidos.keys.first;
-
-      // remove a lista de uso de items no pedido
-      batch.delete(produtosCardapioUtilizados.doc(produto.id).collection("usado_em").doc(pedido.id));
-
-      produtosAtualizados.addAll(produto.composicao.keys);
-      pedido.removerProduto(produto);
+      await _updateItemPedido(pedidoId, novaqtd, produtoAlteradoId);
+    } catch (_) {
+      rethrow;
     }
-
-    //remove as repetições
-    produtosAtualizados = produtosAtualizados.toSet().toList();
-
-    batch.delete(meusPedidos.doc(pedido.id)); // remove o pedido
-
-    for (ProdutoEstoque produto in produtosAtualizados) {
-      batch.update(meuEstoque.doc(produto.id), {"quantidade": produto.quantidade}); //atualiza os produtos do estoque corretamente
-    }
-
-    batch.commit();
-
-    return 42;
   }
 
-  Future<int> fecharPedido(Pedido pedido) async {
-    CollectionReference meusPedidosFechados = _instance.collection("pedidos_fechados").doc(_uid).collection("meus_pedidos_fechados");
-    CollectionReference meusPedidos = _instance.collection("pedidos").doc(_uid).collection("meus_pedidos");
-    CollectionReference produtosCardapioUtilizados =
-        _instance.collection("produtos_utilizados").doc(_uid).collection("produtos_cardapio_utilizados");
-
-    DocumentReference newDocRef = meusPedidosFechados.doc();
-    WriteBatch batch = _instance.batch();
-
-    PedidoFechado pedidoFechado = PedidoFechado(pedido);
-
-    //adiciona o pedido fechado
-    batch.set(newDocRef, pedidoFechado.toMap());
-
-    batch.delete(meusPedidos.doc(pedido.id)); // remove o pedido
-
-    // remove os produtos da lista de produtos do cardapio usados
-    for (var produto in pedido.produtosVendidos.keys) {
-      batch.delete(produtosCardapioUtilizados.doc(produto.id).collection("usado_em").doc(pedido.id));
+  Future<void> deletePedido(Pedido pedido) async {
+    try {
+      await _dio.post(_urlBasePedidos + "/${pedido.id}/deletar");
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
     }
+  }
 
-    batch.commit();
-
-    return 42;
+  Future<void> fecharPedido(Pedido pedido) async {
+    try {
+      await _dio.post(_urlBasePedidos + "/${pedido.id}/fechar");
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
+    }
   }
 
   Future<ListaPedidosFechados> getPedidosFechadosList() async {
-    ListaPedidosFechados listaPedidosFechados = ListaPedidosFechados();
+    try {
+      ListaPedidosFechados listaPedidosFechados = ListaPedidosFechados();
+      Response response = await _dio.get(_urlBasePedidosFechados);
 
-    QuerySnapshot querySnapshot = await _instance.collection("pedidos_fechados").doc(_uid).collection("meus_pedidos_fechados").get();
-    if (querySnapshot.docs.isNotEmpty) {
-      for (var doc in querySnapshot.docs) {
-        PedidoFechado pedido = PedidoFechado.fromMap(doc.data());
+      List dados = response.data;
+      for (dynamic dado in dados) {
+        PedidoFechado pedido = PedidoFechado.fromMap(dado);
         listaPedidosFechados.adicionarPedido(pedido);
       }
+      return listaPedidosFechados;
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
     }
-    return listaPedidosFechados;
   }
 }

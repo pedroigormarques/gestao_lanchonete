@@ -24,16 +24,17 @@ class TelaProdutoCardapio extends StatelessWidget {
     _produtoCardapioBloc.add(CarregarProdutoCardapio(idProduto));
 
     return BlocConsumer<ProdutoCardapioBloc, ProdutoCardapioState>(
-      buildWhen: (previous, current) => current is! EstadoDeErroProdutoCardapio && current is! EstadoDeSucessoProdutoCardapio,
+      buildWhen: (previous, current) =>
+          current is! EstadoDeErroProdutoCardapio &&
+          current is! EstadoDeSucessoProdutoCardapio,
       builder: (context, state) {
-        
         String _composicao = "";
         if (state is ProdutoDoCardapioCarregado) {
           state.produto.composicao.forEach((key, value) {
-            _composicao += " ${key.nomeProduto}($value ${describeEnum(key.unidade)});";
+            _composicao +=
+                " ${key.nomeProduto}($value ${describeEnum(key.unidade)});";
           });
         }
-        
 
         if (state is CarregandoProdutoCardapio) {
           return TelaCarregamento.gerarTelaCarregamento(_tituloDaPagina);
@@ -50,18 +51,26 @@ class TelaProdutoCardapio extends StatelessWidget {
                       context,
                       PageRouteBuilder(
                           reverseTransitionDuration: Duration.zero,
-                          pageBuilder: (context, animation1, secondaryAnimation) => TelaEdicaoItemCardapio(idProduto: idProduto)),
+                          pageBuilder:
+                              (context, animation1, secondaryAnimation) =>
+                                  TelaEdicaoItemCardapio(idProduto: idProduto)),
                     );
-                    _produtoCardapioBloc.add(CarregarProdutoCardapio(idProduto));
+                    _produtoCardapioBloc
+                        .add(CarregarProdutoCardapio(idProduto));
                   },
                   icon: const Icon(Icons.edit),
                 ),
                 IconButton(
                   onPressed: () {
-                    DialogConfirmacao.gerarDialogConfirmacao(context, 'Deseja realmente remover este produto?').then(
+                    DialogConfirmacao.gerarDialogConfirmacao(
+                            context, 'Deseja realmente remover este produto?')
+                        .then(
                       (resposta) {
                         if (resposta) {
-                          _produtoCardapioBloc.add(RemoverDoCardapio(state.produto));
+                          TelaCarregamento.gerarDialogCarregando(
+                              context, 'Removendo produto do cardápio...');
+                          _produtoCardapioBloc
+                              .add(RemoverDoCardapio(state.produto));
                         }
                       },
                     );
@@ -91,14 +100,17 @@ class TelaProdutoCardapio extends StatelessWidget {
                           state.produto.nomeProduto,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 32, fontWeight: FontWeight.bold),
                         ),
-                        const Padding(padding: EdgeInsets.symmetric(vertical: 16.0)),
+                        const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16.0)),
                         Text(
                           'Quantidade produzível: ${state.produto.visualizarQuantidade().toString()}',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w400),
+                          style: const TextStyle(
+                              fontSize: 24, fontWeight: FontWeight.w400),
                         ),
                       ],
                     ),
@@ -164,14 +176,20 @@ class TelaProdutoCardapio extends StatelessWidget {
             ),
           );
         }
-        return TelaErro.gerarTelaErro(_tituloDaPagina, "Erro ao carregar informações do produto");
+        return TelaErro.gerarTelaErro(
+            _tituloDaPagina, "Erro ao carregar informações do produto");
       },
       listener: (BuildContext context, state) {
+        if (state is ErroAoRemoverProdutoCardapio ||
+            state is SucessoAoRemoverProdutoCardapio) {
+          Navigator.pop(context); //remove o carregamento
+        }
         if (state is ErroAoRemoverProdutoCardapio) {
           NotificacaoSnackBar.gerarSnackBar(context, "ERRO: " + state.erro);
         }
         if (state is SucessoAoRemoverProdutoCardapio) {
-          NotificacaoSnackBar.gerarSnackBar(context, "Produto removido com sucesso");
+          NotificacaoSnackBar.gerarSnackBar(
+              context, "Produto removido com sucesso");
           Navigator.pop(context);
         }
       },

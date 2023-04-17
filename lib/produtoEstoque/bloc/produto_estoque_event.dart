@@ -1,13 +1,7 @@
 import 'package:lanchonete/produtoEstoque/Models/produto_estoque.dart';
+import 'package:lanchonete/stream/bloc/stream_event.dart';
 
-abstract class ProdutoEstoqueEvent {}
-
-class IniciarStreamProdutosEstoque extends ProdutoEstoqueEvent {
-  String uid;
-  IniciarStreamProdutosEstoque(this.uid);
-}
-
-class PararStreamProdutosEstoque extends ProdutoEstoqueEvent {}
+abstract class ProdutoEstoqueEvent extends StreamEvent {}
 
 class CarregarProdutosEstoque extends ProdutoEstoqueEvent {}
 

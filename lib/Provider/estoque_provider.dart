@@ -1,50 +1,56 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:dio/dio.dart';
+import 'package:lanchonete/stream/controller/controlador_stream_api.dart';
+import 'package:lanchonete/provider/conexao/dados_provider.dart';
+import 'package:lanchonete/provider/conexao/dio_controller.dart';
+import 'package:lanchonete/provider/stream_provider.dart';
+import 'package:lanchonete/provider/manipulador_erro.dart';
 import 'package:lanchonete/produtoEstoque/Models/produto_estoque.dart';
 import 'package:lanchonete/produtoEstoque/Models/estoque.dart';
 
-class EstoqueFirestoreServer {
+class EstoqueApiProvider extends StreamProvider {
   // Atributo que irá afunilar todas as consultas
-  static EstoqueFirestoreServer helper = EstoqueFirestoreServer._createInstance();
-
+  static EstoqueApiProvider helper = EstoqueApiProvider._createInstance();
   // Construtor privado
-  EstoqueFirestoreServer._createInstance();
+  EstoqueApiProvider._createInstance()
+      : super(DadosProvider.localProdutosEstoque + '/sse');
 
-  String? _uid;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
   Estoque? _estoque;
 
-  void limparDadosProdutosEstoque() {
-    _estoque = null;
-    _uid = null;
+  bool get carregado {
+    return _estoque != null && statusConexao == StatusConexao.conectado;
   }
 
-  Stream<void> iniciarStreamProdutosEstoque(String uid) {
-    _uid = uid;
-    _estoque = Estoque();
+  final _urlBaseEstoque = DadosProvider.localProdutosEstoque;
+  final Dio _dio = DioController.instance.dioAreaRestrita;
 
-    CollectionReference estoqueColection = _db.collection("estoques").doc(uid).collection("meu_estoque");
-    return estoqueColection.snapshots().map((event) {
-      for (DocumentChange docChange in event.docChanges) {
-        ProdutoEstoque produtoEstoque = ProdutoEstoque.fromMap(docChange.doc.data());
-        produtoEstoque.id = docChange.doc.id;
-
-        switch (docChange.type.name) {
-          case "added":
-            _estoque!.adicionarProduto(produtoEstoque);
-            break;
-          case "removed":
-            _estoque!.removerProduto(produtoEstoque.id);
-            break;
-          case "modified":
-            _estoque!.atualizarProduto(produtoEstoque);
-            break;
+  @override
+  void mapFunction(List<Map> dados) {
+    for (Map dado in dados) {
+      if (dado['acao'] == "Removido") {
+        _estoque!.removerProduto(dado['id']);
+      } else {
+        ProdutoEstoque produtoEstoque = ProdutoEstoque.fromMap(dado['data']);
+        produtoEstoque.id = dado['id'];
+        if (dado['acao'] == "Adicionado") {
+          _estoque!.adicionarProduto(produtoEstoque);
+        } else if (dado['acao'] == "Alterado") {
+          _estoque!.atualizarProduto(produtoEstoque);
         }
       }
-      return; // notifica a alteração sem passar informações 
-    });
+    }
+    return; // notifica a alteração sem passar informações
+  }
+
+  @override
+  void criarRepositorioDados() {
+    _estoque = Estoque();
+  }
+
+  @override
+  void limparRepositorioDados() {
+    _estoque = null;
   }
 
   List<ProdutoEstoque> getProdutoEstoqueList() {
@@ -55,47 +61,32 @@ class EstoqueFirestoreServer {
     return _estoque!.carregarProduto(produtoEstoqueId);
   }
 
-  Future<int> insertProdutoEstoque(ProdutoEstoque produtoEstoque) async {
-    CollectionReference meuEstoque = _db.collection("estoques").doc(_uid).collection("meu_estoque");
-
-    bool produtoExiste = (await meuEstoque.where('nomeProduto', isEqualTo: produtoEstoque.nomeProduto).get()).docs.isNotEmpty;
-    if (produtoExiste) {
-      throw const FormatException("Já existe um produto com esse nome cadastrado");
-    } else {
-      DocumentReference docRef = await meuEstoque.add(produtoEstoque.toMap());
-      produtoEstoque.id = docRef.id;
+  Future<void> insertProdutoEstoque(ProdutoEstoque produtoEstoque) async {
+    try {
+      var dados = produtoEstoque.toMap();
+      dados['idUsuario'] = uid;
+      await _dio.post(_urlBaseEstoque, data: dados);
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
     }
-    return 42;
   }
 
-  Future<int> updateProdutoEstoque(ProdutoEstoque produtoEstoque) async {
-    _db.collection("estoques").doc(_uid).collection("meu_estoque").doc(produtoEstoque.id).update(produtoEstoque.toMap());
-
-    return 42;
-  }
-
-  Future<int> deleteProdutoEstoque(produtoEstoqueId) async {
-    DocumentReference produtoEstoqueDocument = _db.collection("estoques").doc(_uid).collection("meu_estoque").doc(produtoEstoqueId);
-
-    bool produtoSendoUsado = await _getProdutoSendoUsado(produtoEstoqueId);
-
-    if (produtoSendoUsado) {
-      throw const FormatException("Produto está sendo utilizado por ao menos um produto do cardápio");
-    } else {
-      produtoEstoqueDocument.delete();
+  Future<void> updateProdutoEstoque(ProdutoEstoque produtoEstoque) async {
+    try {
+      await _dio.put(
+        _urlBaseEstoque + "/${produtoEstoque.id}",
+        data: produtoEstoque.toMap(),
+      );
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
     }
-    return 42;
   }
 
-  Future<bool> _getProdutoSendoUsado(produtoEstoqueId) async {
-    DocumentReference produtoEstoqueUtilizados =
-        _db.collection("produtos_utilizados").doc(_uid).collection("produtos_estoque_utilizados").doc(produtoEstoqueId);
-
-    QuerySnapshot querySnapshot = await produtoEstoqueUtilizados.collection("usado_em").limit(1).get();
-    if (querySnapshot.docs.isNotEmpty) {
-      return true;
-    } else {
-      return false;
+  Future<void> deleteProdutoEstoque(String produtoEstoqueId) async {
+    try {
+      await _dio.delete(_urlBaseEstoque + "/$produtoEstoqueId");
+    } catch (erro) {
+      throw ManipuladorErro.gerarErro(erro);
     }
   }
 }

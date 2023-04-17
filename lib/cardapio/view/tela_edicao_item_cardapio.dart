@@ -42,7 +42,10 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
   CATEGORIAS? _categoria;
 
   int _currentStep = 0;
-  final List<GlobalKey<FormState>> _formKeys = [GlobalKey<FormState>(), GlobalKey<FormState>()];
+  final List<GlobalKey<FormState>> _formKeys = [
+    GlobalKey<FormState>(),
+    GlobalKey<FormState>()
+  ];
 
   _stepState(int step) {
     if (_currentStep > step) {
@@ -78,12 +81,15 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
     BlocProvider.of<ProdutoEstoqueBloc>(context).add(CarregarProdutosEstoque());
     widget._produtoCardapioBloc = BlocProvider.of<ProdutoCardapioBloc>(context);
     if (widget.opcaoAcesso == 1) {
-      widget._produtoCardapioBloc.add(CarregarProdutoCardapio(widget.idProduto!));
+      widget._produtoCardapioBloc
+          .add(CarregarProdutoCardapio(widget.idProduto!));
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: widget.opcaoAcesso == 0 ? const Text('Adicionar novo Produto') : const Text('Atualizar Produto'),
+        title: widget.opcaoAcesso == 0
+            ? const Text('Adicionar novo Produto')
+            : const Text('Atualizar Produto'),
       ),
       body: BlocBuilder<ProdutoEstoqueBloc, ProdutoEstoqueState>(
         builder: (context, stateProdutosEstoque) {
@@ -100,17 +106,23 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
             widget.produtosEstoque = stateProdutosEstoque.produtosEstocados;
 
             return BlocConsumer<ProdutoCardapioBloc, ProdutoCardapioState>(
-              buildWhen: (previous, current) => current is! EstadoDeErroProdutoCardapio && current is! EstadoDeSucessoProdutoCardapio,
+              buildWhen: (previous, current) =>
+                  current is! EstadoDeErroProdutoCardapio &&
+                  current is! EstadoDeSucessoProdutoCardapio,
               builder: (context, stateProdutoCardapio) {
-                if (widget.idProduto != null && stateProdutoCardapio is CarregandoProdutoCardapio) {
+                if (widget.idProduto != null &&
+                    stateProdutoCardapio is CarregandoProdutoCardapio) {
                   return TelaCarregamento.gerarCorpoTelaCarregamento();
                 }
 
-                if (widget.idProduto != null && stateProdutoCardapio is ErroCarregarProdutoCardapio) {
-                  return TelaErro.gerarCorpoTelaErro("Erro ao carregar o produto do cardapio a ser atualizado");
+                if (widget.idProduto != null &&
+                    stateProdutoCardapio is ErroCarregarProdutoCardapio) {
+                  return TelaErro.gerarCorpoTelaErro(
+                      "Erro ao carregar o produto do cardapio a ser atualizado");
                 }
 
-                if (!widget._produtoCarregado && stateProdutoCardapio is ProdutoDoCardapioCarregado) {
+                if (!widget._produtoCarregado &&
+                    stateProdutoCardapio is ProdutoDoCardapioCarregado) {
                   widget._produtoCarregado = true;
                   widget._produtoCardapioAntigo = stateProdutoCardapio.produto;
 
@@ -124,14 +136,17 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
 
                 return Stepper(
                   type: StepperType.horizontal,
-                  controlsBuilder: (BuildContext context, ControlsDetails controls) {
+                  controlsBuilder:
+                      (BuildContext context, ControlsDetails controls) {
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 16.0),
                       child: Row(
                         children: <Widget>[
                           ElevatedButton(
                             onPressed: controls.onStepContinue,
-                            child: (_currentStep == _steps().length - 1) ? const Text('Salvar') : const Text('Continuar'),
+                            child: (_currentStep == _steps().length - 1)
+                                ? const Text('Salvar')
+                                : const Text('Continuar'),
                           ),
                           if (_currentStep != 0)
                             TextButton(
@@ -159,16 +174,23 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
                         });
                       } else {
                         if (widget.opcaoAcesso == 0) {
+                          TelaCarregamento.gerarDialogCarregando(
+                              context, 'Adicionando produto ao cardápio...');
                           widget._produtoCardapioBloc.add(
                             AdicionarAoCardapio(
-                              ProdutoCardapio(_nomeProduto!, _descricao!, _preco!, _categoria!, _composicao),
+                              ProdutoCardapio(_nomeProduto!, _descricao!,
+                                  _preco!, _categoria!, _composicao),
                             ),
                           );
                         } else {
+                          TelaCarregamento.gerarDialogCarregando(
+                              context, 'Atualizando produto do cardápio...');
                           widget._produtoCardapioBloc.add(
                             AtualizarProdutoDoCardapio(
                               widget._produtoCardapioAntigo!,
-                              ProdutoCardapio(_nomeProduto!, _descricao!, _preco!, _categoria!, _composicao, id: widget.idProduto!),
+                              ProdutoCardapio(_nomeProduto!, _descricao!,
+                                  _preco!, _categoria!, _composicao,
+                                  id: widget.idProduto!),
                             ),
                           );
                         }
@@ -189,19 +211,28 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
                 );
               },
               listener: (BuildContext context, state) {
+                if (state is EstadoDeErroProdutoCardapio ||
+                    state is EstadoDeSucessoProdutoCardapio) {
+                  Navigator.pop(context); //remove o carregamento
+                }
                 if (state is EstadoDeErroProdutoCardapio) {
-                  NotificacaoSnackBar.gerarSnackBar(context, "ERRO: " + state.erro);
+                  NotificacaoSnackBar.gerarSnackBar(
+                      context, "ERRO: " + state.erro);
                 }
                 if (state is EstadoDeSucessoProdutoCardapio) {
                   NotificacaoSnackBar.gerarSnackBar(
-                      context, widget.opcaoAcesso == 0 ? "Cadastro do produto concluído" : "Alterações no produto concluídas");
+                      context,
+                      widget.opcaoAcesso == 0
+                          ? "Cadastro do produto concluído"
+                          : "Alterações no produto concluídas");
                   Navigator.pop(context);
                 }
               },
             );
           }
 
-          return TelaErro.gerarCorpoTelaErro("Erro inesperado ao tentar editar partindo do produtos do estoque");
+          return TelaErro.gerarCorpoTelaErro(
+              "Erro inesperado ao tentar editar partindo do produtos do estoque");
         },
       ),
     );
@@ -245,7 +276,8 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
               onSaved: (desc) => _descricao = desc!,
             ),
             TextFormField(
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               initialValue: _preco != null ? _preco!.toStringAsFixed(2) : null,
               decoration: const InputDecoration(
                 labelText: "Preço(R\$): ",
@@ -273,9 +305,13 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
                   child: Container(
                     margin: const EdgeInsets.all(10),
                     padding: const EdgeInsets.symmetric(horizontal: 15),
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), color: Colors.grey[300]),
+                    decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: Colors.grey[300]),
                     child: DropdownButtonFormField<String>(
-                      value: _categoria != null ? _categoria!.index.toString() : null,
+                      value: _categoria != null
+                          ? _categoria!.index.toString()
+                          : null,
                       icon: const Icon(Icons.arrow_drop_down),
                       elevation: 16,
                       isExpanded: true,
@@ -290,7 +326,8 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
                           child: Text(describeEnum(value)),
                         );
                       }).toList(),
-                      validator: (String? un) => un == null ? "Selecione uma categoria" : null,
+                      validator: (String? un) =>
+                          un == null ? "Selecione uma categoria" : null,
                       onSaved: (String? un) {
                         _categoria = CATEGORIAS.values[int.parse(un!)];
                       },
@@ -313,10 +350,16 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
             ),
             MultiSelectDialogField(
               initialValue: _composicao
-                  .map((key, value) => MapEntry(widget.produtosEstoque.firstWhere((element) => element.id == key.id), value))
+                  .map((key, value) => MapEntry(
+                      widget.produtosEstoque
+                          .firstWhere((element) => element.id == key.id),
+                      value))
                   .keys
                   .toList(),
-              items: widget.produtosEstoque.map((produto) => MultiSelectItem<ProdutoEstoque>(produto, produto.nomeProduto)).toList(),
+              items: widget.produtosEstoque
+                  .map((produto) => MultiSelectItem<ProdutoEstoque>(
+                      produto, produto.nomeProduto))
+                  .toList(),
               title: const Text("Produtos estocados"),
               buttonIcon: const Icon(Icons.edit),
               buttonText: const Text(
@@ -331,7 +374,8 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
                 color: Colors.grey[300],
               ),
               onConfirm: (List produtosSelecionados) {
-                _composicao.removeWhere((key, value) => !produtosSelecionados.contains(key));
+                _composicao.removeWhere(
+                    (key, value) => !produtosSelecionados.contains(key));
                 for (var produtoSelecionado in produtosSelecionados) {
                   if (!_composicao.keys.contains(produtoSelecionado)) {
                     _composicao[produtoSelecionado] = -1;
@@ -339,7 +383,9 @@ class _TelaEdicaoItemCardapioState extends State<TelaEdicaoItemCardapio> {
                 }
               },
               validator: (List<ProdutoEstoque>? produtosSelecionados) =>
-                  produtosSelecionados!.isEmpty ? "Selecione ao menos um produto" : null,
+                  produtosSelecionados!.isEmpty
+                      ? "Selecione ao menos um produto"
+                      : null,
             ),
           ],
         ),

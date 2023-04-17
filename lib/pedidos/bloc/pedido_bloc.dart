@@ -4,14 +4,15 @@ import 'package:bloc/bloc.dart';
 import 'package:lanchonete/pedidos/bloc/pedido_event.dart';
 import 'package:lanchonete/pedidos/bloc/pedido_state.dart';
 import 'package:lanchonete/pedidos/models/pedido.dart';
-import 'package:lanchonete/Provider/pedido_provider.dart';
+import 'package:lanchonete/stream/controller/controlador_stream_api.dart';
+import 'package:lanchonete/provider/stream_provider.dart';
+import 'package:lanchonete/provider/pedido_provider.dart';
+import 'package:lanchonete/stream/bloc/stream_bloc.dart';
+import 'package:lanchonete/stream/bloc/stream_event.dart';
 
-class PedidoBloc extends Bloc<PedidoEvent, PedidoState> {
-  StreamSubscription? _listener;
-  PedidoBloc() : super(CarregandoPedidos()) {
-    on<IniciarStreamPedidos>(_iniciarStream);
-    on<PararStreamPedidos>(_pararStream);
-
+class PedidoBloc extends StreamBloc<PedidoEvent, PedidoState> {
+  final PedidosApiProvider _pedidoProvider = PedidosApiProvider.helper;
+  PedidoBloc() : super(PedidosApiProvider.helper, CarregandoPedidos()) {
     on<CarregarListaPedidos>(_carregarListaPedidos);
     on<CarregarPedido>(_carregarPedido);
     on<AdicionarPedido>(_adicionarPedido);
@@ -24,45 +25,51 @@ class PedidoBloc extends Bloc<PedidoEvent, PedidoState> {
     on<RemoverQuantidadeItemPedido>(_removerQuantidadeItemPedido);
   }
 
-  void _iniciarStream(IniciarStreamPedidos event, Emitter<PedidoState> emit) {
-    _listener = PedidosFirestoreServer.helper.iniciarStreamPedidos(event.uid).listen((event) {
-      PedidoState atualState = state;
-      if (atualState is PedidoCarregado) {
-        add(CarregarPedido(atualState.pedido.id));
-      } else if (state is PedidosCarregados) {
-        add(CarregarListaPedidos());
-      }
-    });
+  @override
+  void notificarAtualizacao(NovaNotificacao event, Emitter<PedidoState> emit) {
+    Notificacao notificacao = event.notificacao;
+    switch (notificacao.tipoNotificacao) {
+      case TipoNotificacao.conectando:
+        emit(CarregandoPedidos());
+        break;
+      case TipoNotificacao.erroConexao:
+        emit(ErroCarregarPedidos());
+        break;
+      case TipoNotificacao.novoDado:
+        PedidoState state = this.state;
+        if (state is PedidoCarregado) {
+          add(CarregarPedido(state.pedido.id));
+        } else if (state is PedidosCarregados || state is CarregandoPedidos) {
+          add(CarregarListaPedidos());
+        }
+        break;
+    }
   }
 
-  void _pararStream(PararStreamPedidos event, Emitter<PedidoState> emit) {
-    _listener!.cancel();
-    PedidosFirestoreServer.helper.limparDadosProdutosEstoque();
-  }
-
-  void _carregarListaPedidos(CarregarListaPedidos event, Emitter<PedidoState> emit) {
-    emit(CarregandoPedidos());
-    try {
-      emit(PedidosCarregados(PedidosFirestoreServer.helper.getPedidosList()));
-    } catch (_) {
-      emit(ErroCarregarPedidos());
+  void _carregarListaPedidos(
+      CarregarListaPedidos event, Emitter<PedidoState> emit) {
+    //Só carrega se conexão bem sucedida.
+    //Do contrário, a stream que controla o estado da página principal
+    if (_pedidoProvider.statusConexao == StatusConexao.conectado) {
+      emit(PedidosCarregados(_pedidoProvider.getPedidosList()));
     }
   }
 
   void _carregarPedido(CarregarPedido event, Emitter<PedidoState> emit) {
     emit(CarregandoPedido());
     try {
-      Pedido pedido = PedidosFirestoreServer.helper.getPedido(event.pedidoId);
+      Pedido pedido = _pedidoProvider.getPedido(event.pedidoId);
       emit(PedidoCarregado(pedido));
     } catch (_) {
       emit(ErroCarregarPedido());
     }
   }
 
-  Future<void> _adicionarPedido(AdicionarPedido event, Emitter<PedidoState> emit) async {
+  Future<void> _adicionarPedido(
+      AdicionarPedido event, Emitter<PedidoState> emit) async {
     var state = (this.state as PedidosCarregados);
     try {
-      await PedidosFirestoreServer.helper.insertPedido(event.pedido);
+      await _pedidoProvider.insertPedido(event.pedido);
       emit(SucessoAoAdicionarPedido("Pedido adicionado na lista com sucesso"));
     } on FormatException catch (erro) {
       emit(ErroAoAdicionarPedido(erro.message));
@@ -72,15 +79,19 @@ class PedidoBloc extends Bloc<PedidoEvent, PedidoState> {
     }
   }
 
-  Future<void> _adicionarItemPedido(AdicionarItemPedido event, Emitter<PedidoState> emit) async {
+  Future<void> _adicionarItemPedido(
+      AdicionarItemPedido event, Emitter<PedidoState> emit) async {
     final state = this.state;
     if (state is PedidoCarregado) {
       try {
-        Pedido aux = state.pedido; //--------------------------------------------------
+        Pedido aux =
+            state.pedido; //--------------------------------------------------
         aux.adicionarProduto(event.produtoCardapio);
-        await PedidosFirestoreServer.helper.updateAdicionarItemPedido(event.pedidoId, aux, event.produtoCardapio.id);
+        await _pedidoProvider.updateAdicionarItemPedido(
+            event.pedidoId, aux, event.produtoCardapio.id);
 
-        emit(SucessoAoAdicionarItemPedido("Item adicionado no pedido com sucesso"));
+        emit(SucessoAoAdicionarItemPedido(
+            "Item adicionado no pedido com sucesso"));
         emit(PedidoCarregado(aux));
       } on FormatException catch (erro) {
         emit(ErroAoAdicionarItemPedido(erro.message));
@@ -89,13 +100,16 @@ class PedidoBloc extends Bloc<PedidoEvent, PedidoState> {
     }
   }
 
-  Future<void> _removerItemPedido(RemoverItemPedido event, Emitter<PedidoState> emit) async {
+  Future<void> _removerItemPedido(
+      RemoverItemPedido event, Emitter<PedidoState> emit) async {
     final state = this.state;
     if (state is PedidoCarregado) {
       try {
-        Pedido aux = state.pedido;  //--------------------------------------------------
+        Pedido aux =
+            state.pedido; //--------------------------------------------------
         aux.removerProduto(event.produtoCardapio);
-        await PedidosFirestoreServer.helper.updateRemoverItemPedido(event.pedidoId, aux, event.produtoCardapio);
+        await _pedidoProvider.updateRemoverItemPedido(
+            event.pedidoId, aux, event.produtoCardapio);
 
         emit(SucessoAoRemoverItemPedido("Item removido do pedido com sucesso"));
         emit(PedidoCarregado(aux));
@@ -106,15 +120,19 @@ class PedidoBloc extends Bloc<PedidoEvent, PedidoState> {
     }
   }
 
-  Future<void> _adicionarQuantidadeItemPedido(AdicionarQuantidadeItemPedido event, Emitter<PedidoState> emit) async {
+  Future<void> _adicionarQuantidadeItemPedido(
+      AdicionarQuantidadeItemPedido event, Emitter<PedidoState> emit) async {
     final state = this.state;
     if (state is PedidoCarregado) {
       try {
-        Pedido aux = state.pedido;  //--------------------------------------------------
+        Pedido aux =
+            state.pedido; //--------------------------------------------------
         aux.adicionarQuantidadeItem(event.produtoCardapio, event.quantidade);
-        await PedidosFirestoreServer.helper.updateQuantidadeItemPedido(event.pedidoId, aux, event.produtoCardapio.id);
+        await _pedidoProvider.updateQuantidadeItemPedido(
+            event.pedidoId, aux, event.produtoCardapio.id);
 
-        emit(SucessoAoAlterarQuantidadeItemPedido("Quantidade atualizada com sucesso"));
+        emit(SucessoAoAlterarQuantidadeItemPedido(
+            "Quantidade atualizada com sucesso"));
         emit(PedidoCarregado(aux));
       } on FormatException catch (erro) {
         emit(ErroAoAlterarQuantidadeItemPedido(erro.message));
@@ -123,15 +141,19 @@ class PedidoBloc extends Bloc<PedidoEvent, PedidoState> {
     }
   }
 
-  Future<void> _removerQuantidadeItemPedido(RemoverQuantidadeItemPedido event, Emitter<PedidoState> emit) async {
+  Future<void> _removerQuantidadeItemPedido(
+      RemoverQuantidadeItemPedido event, Emitter<PedidoState> emit) async {
     final state = this.state;
     if (state is PedidoCarregado) {
       try {
-        Pedido aux = state.pedido;  //--------------------------------------------------
+        Pedido aux =
+            state.pedido; //--------------------------------------------------
         aux.removerQuantidadeItem(event.produtoCardapio, event.quantidade);
-        await PedidosFirestoreServer.helper.updateQuantidadeItemPedido(event.pedidoId, aux, event.produtoCardapio.id);
+        await _pedidoProvider.updateQuantidadeItemPedido(
+            event.pedidoId, aux, event.produtoCardapio.id);
 
-        emit(SucessoAoAlterarQuantidadeItemPedido("Quantidade atualizada com sucesso"));
+        emit(SucessoAoAlterarQuantidadeItemPedido(
+            "Quantidade atualizada com sucesso"));
         emit(PedidoCarregado(aux));
       } on FormatException catch (erro) {
         emit(ErroAoAlterarQuantidadeItemPedido(erro.message));
@@ -140,11 +162,12 @@ class PedidoBloc extends Bloc<PedidoEvent, PedidoState> {
     }
   }
 
-  Future<void> _removerPedido(RemoverPedido event, Emitter<PedidoState> emit) async {
+  Future<void> _removerPedido(
+      RemoverPedido event, Emitter<PedidoState> emit) async {
     final state = this.state;
     if (state is PedidoCarregado) {
       try {
-        await PedidosFirestoreServer.helper.deletePedido(event.pedido);
+        await _pedidoProvider.deletePedido(event.pedido);
         emit(SucessoAoRemoverPedido("Pedido cancelado com sucesso"));
       } on FormatException catch (erro) {
         emit(ErroAoRemoverPedido(erro.message));
@@ -154,15 +177,16 @@ class PedidoBloc extends Bloc<PedidoEvent, PedidoState> {
     }
   }
 
-  //para exemplo fará a mesma coisa que o remover pedido
-  Future<void> _fecharPedido(FecharPedido event, Emitter<PedidoState> emit) async {
+  Future<void> _fecharPedido(
+      FecharPedido event, Emitter<PedidoState> emit) async {
     final state = this.state;
     if (state is PedidoCarregado) {
       try {
         if (event.pedido.produtosVendidos.isEmpty) {
-          throw const FormatException("Adicione algum produto ou exclua o pedido");
+          throw const FormatException(
+              "Adicione algum produto ou exclua o pedido");
         }
-        await PedidosFirestoreServer.helper.fecharPedido(event.pedido);
+        await _pedidoProvider.fecharPedido(event.pedido);
         emit(SucessoAoFecharPedido("Pedido fechado com sucesso"));
       } on FormatException catch (erro) {
         emit(ErroAoFecharPedido(erro.message));
@@ -170,7 +194,8 @@ class PedidoBloc extends Bloc<PedidoEvent, PedidoState> {
         emit(PedidoCarregado(state.pedido));
       }
     } else {
-      emit(ErroAoFecharPedido("Erro ao fechar o pedido! Caminho não estipulado"));
+      emit(ErroAoFecharPedido(
+          "Erro ao fechar o pedido! Caminho não estipulado"));
     }
   }
 }

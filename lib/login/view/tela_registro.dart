@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:lanchonete/login/bloc/autenticacao_bloc.dart';
 import 'package:lanchonete/login/bloc/autenticacao_event.dart';
+import 'package:lanchonete/view/tela_carregamento.dart';
 
 class TelaRegistro extends StatelessWidget {
   TelaRegistro({Key? key}) : super(key: key);
@@ -28,7 +29,9 @@ class TelaRegistro extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Registrar conta', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                  const Text('Registrar conta',
+                      style:
+                          TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
                   nomeEstabelecimentoFormField(),
                   enderecoFormField(),
                   emailFormField(),
@@ -37,8 +40,11 @@ class TelaRegistro extends StatelessWidget {
                     onPressed: () {
                       if (formkey.currentState!.validate()) {
                         formkey.currentState!.save();
-                        BlocProvider.of<AutenticacaoBloc>(context)
-                            .add(RegistrarUsuario(_email!, _senha!, _nomeLanchonete!, _endereco!));
+                        TelaCarregamento.gerarDialogCarregando(
+                            context, 'Registrando usuário...');
+                        BlocProvider.of<AutenticacaoBloc>(context).add(
+                            RegistrarUsuario(_email!, _senha!, _nomeLanchonete!,
+                                _endereco!));
                       }
                     },
                     child: const Text("Registrar"),
